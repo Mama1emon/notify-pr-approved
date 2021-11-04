@@ -1,0 +1,80 @@
+name: Notify when PR was approved
+on:
+  workflow_call:
+    inputs:
+      number:
+        description: 'Number of pull request'
+        required: true
+        type: number
+      sender:
+        description: 'Sender of pull request'
+        required: true
+        type: string
+      title:
+        description: 'Title of pull request'
+        required: true
+        type: string
+      html_url:
+        description: 'Html url of pull request'
+        required: true
+        type: string
+      chat_id:
+        required: true
+        type: string
+      token:
+        required: true
+        type: string
+    secrets: 
+      token:
+        required: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find first approve comment
+        id: find-last-comment
+        uses: peter-evans/find-comment@v1
+        with:
+          issue-number: ${{ inputs.number }}
+          comment-author: 'github-actions[bot]'
+          body-includes: 'Для слияния не хватает ещё одного аппрува!'
+
+      - name: Send Telegram message if it's first approve
+        if: steps.find-last-comment.outputs.comment-id == 0
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ inputs.chat_id }}
+          token: ${{ inputs.token }}
+          message: |
+            ${{ inputs.sender }} одобрил ПР(#${{ inputs.number }}): «${{ inputs.title }}» !
+
+            Для слияния не хватает ещё одного аппрува!
+
+            Узнать больше: ${{ inputs.html_url }}
+
+      - name: GitHub Bot comment if it's first approve
+        if: steps.find-last-comment.outputs.comment-id == 0
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ inputs.number }}
+          body: 'Для слияния не хватает ещё одного аппрува!'
+
+      - name: Send Telegram message if it's second approve
+        if: steps.find-last-comment.outputs.comment-id != 0
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ inputs.chat_id }}
+          token: ${{ inputs.token }}
+          message: |
+            ${{ inputs.sender }} одобрил ПР(#${{ inputs.number }}): «${{ inputs.title }}» !
+
+            Все аппрувы получены!
+
+            Узнать больше: ${{ inputs.html_url }}
+
+      - name: GitHub Bot comment if it's second approve
+        if: steps.find-last-comment.outputs.comment-id != 0
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          issue-number: ${{ inputs.number }}
+          body: 'Все аппрувы получены!'
